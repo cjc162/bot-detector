@@ -27,31 +27,15 @@ package com.botdetector.model;
 
 import com.google.gson.annotations.SerializedName;
 import java.time.Instant;
-import lombok.AllArgsConstructor;
+import java.util.Map;
+import lombok.Builder;
 import lombok.Value;
-import net.runelite.api.coords.WorldPoint;
+import net.runelite.api.kit.KitType;
 
 @Value
-@AllArgsConstructor
+@Builder
 public class PlayerSighting
 {
-	public PlayerSighting(
-		String playerName,
-		WorldPoint wp,
-		boolean inMembersWorld,
-		boolean inPVPWorld,
-		Instant timestamp)
-	{
-		this(playerName,
-			wp.getRegionID(),
-			wp.getX(),
-			wp.getY(),
-			wp.getPlane(),
-			inMembersWorld,
-			inPVPWorld,
-			timestamp);
-	}
-
 	@SerializedName("reported")
 	String playerName;
 
@@ -66,6 +50,15 @@ public class PlayerSighting
 
 	@SerializedName("z")
 	int plane;
+
+	@SerializedName("equipment")
+	Map<KitType, Integer> equipment;
+
+	@SerializedName("equipment_ge")
+	int equipmentGEValue;
+
+	@SerializedName("world_number")
+	int worldNumber;
 
 	@SerializedName("on_members_world")
 	boolean inMembersWorld;

@@ -54,6 +54,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
@@ -81,6 +82,7 @@ import net.runelite.api.events.MenuOpened;
 import net.runelite.api.events.MenuOptionClicked;
 import net.runelite.api.events.PlayerSpawned;
 import net.runelite.api.events.WorldChanged;
+import net.runelite.api.kit.KitType;
 import net.runelite.api.widgets.WidgetInfo;
 import net.runelite.client.chat.ChatColorType;
 import net.runelite.client.chat.ChatCommandManager;
@@ -89,6 +91,7 @@ import net.runelite.client.chat.ChatMessageManager;
 import net.runelite.client.chat.QueuedMessage;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.game.ItemManager;
 import net.runelite.client.menus.MenuManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
@@ -168,6 +171,9 @@ public class BotDetectorPlugin extends Plugin
 	private MenuManager menuManager;
 
 	@Inject
+	private ItemManager itemManager;
+
+	@Inject
 	private BotDetectorConfig config;
 
 	@Inject
@@ -200,6 +206,7 @@ public class BotDetectorPlugin extends Plugin
 	private int namesUploaded;
 	private Instant lastFlush = Instant.MIN;
 	private Instant lastStatsRefresh = Instant.MIN;
+	private int currentWorldNumber;
 	private boolean isCurrentWorldMembers;
 	private boolean isCurrentWorldPVP;
 	private boolean isCurrentWorldBlocked;
@@ -558,9 +565,34 @@ public class BotDetectorPlugin extends Plugin
 			return;
 		}
 
+		// Get player's equipment item ids (botanicvelious/Equipment-Inspector)
+		Map<KitType, Integer> equipment = new HashMap<>();
+		int geValue = 0;
+		for (KitType kitType : KitType.values())
+		{
+			int itemId = player.getPlayerComposition().getEquipmentId(kitType);
+			if (itemId >= 0)
+			{
+				equipment.put(kitType, itemId);
+				// Use GE price, not Wiki price
+				geValue += itemManager.getItemPriceWithSource(itemId, false);
+			}
+		}
+
 		WorldPoint wp = WorldPoint.fromLocalInstance(client, player.getLocalLocation());
-		PlayerSighting p = new PlayerSighting(playerName,
-			wp, isCurrentWorldMembers, isCurrentWorldPVP, Instant.now());
+		PlayerSighting p = PlayerSighting.builder()
+			.playerName(playerName)
+			.regionID(wp.getRegionID())
+			.worldX(wp.getX())
+			.worldY(wp.getY())
+			.plane(wp.getPlane())
+			.equipment(equipment)
+			.equipmentGEValue(geValue)
+			.timestamp(Instant.now())
+			.worldNumber(currentWorldNumber)
+			.inMembersWorld(isCurrentWorldMembers)
+			.inPVPWorld(isCurrentWorldPVP)
+			.build();
 
 		synchronized (sightingTable)
 		{
@@ -690,7 +722,7 @@ public class BotDetectorPlugin extends Plugin
 				}
 			}
 		}
-		event.setMenuEntries(menuEntries);
+		client.setMenuEntries(menuEntries);
 	}
 
 	@Subscribe
@@ -771,6 +803,7 @@ public class BotDetectorPlugin extends Plugin
 
 	private void processCurrentWorld()
 	{
+		currentWorldNumber = client.getWorld();
 		EnumSet<WorldType> types = client.getWorldType();
 		isCurrentWorldMembers = types.contains(WorldType.MEMBERS);
 		isCurrentWorldPVP = types.contains(WorldType.PVP);
